@@ -16,7 +16,6 @@ impl SimpleComponent for App {
         adw::Window {
             set_default_width: 450,
             set_default_height: 500,
-            // set_resizable: false,
             #[name = "leaflet"]
             adw::Leaflet {
                 set_can_navigate_back: true,
@@ -34,6 +33,7 @@ impl SimpleComponent for App {
                         gtk::ListBox {
                             set_selection_mode: gtk::SelectionMode::Single,
                             set_vexpand: true,
+                            set_hexpand: true,
                             add_css_class: "navigation-sidebar",
                             adw::ActionRow {
                                 set_icon_name: Some("network-transmit-symbolic"),
