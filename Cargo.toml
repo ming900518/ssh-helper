@@ -1,0 +1,8 @@
+[package]
+name = "ssh-helper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+relm4 = { path = "relm4/relm4", features = ["libadwaita"] }
+
