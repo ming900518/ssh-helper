@@ -5,10 +5,10 @@ use fltk_theme::{ThemeType, WidgetTheme};
 
 fn main() {
     let app = app::App::default();
-    let theme = WidgetTheme::new(ThemeType::AquaClassic);
+    let theme = WidgetTheme::new(ThemeType::Metro);
     theme.apply();
     let mut window = window::Window::default()
-        .with_size(400, 370)
+        .with_size(400, 320)
         .with_label("SSH Helper");
     let mut title = frame::Frame::new(100, 40, 200, 30, "SSH Helper");
     title.set_label_size(32);
@@ -21,7 +21,6 @@ fn main() {
             key_input.set_value(&path);
         }
     });
-    let key_pass_input = key_pass_input();
     let port_input = port_input();
     let mut connect_btn = connect_btn();
     connect_btn.set_callback(move |_| {
@@ -29,7 +28,6 @@ fn main() {
             cloned_key_input.value(),
             host_input.clone().value(),
             port_input.clone().value(),
-            key_pass_input.clone().value()
         )
     });
     window.end();
@@ -69,40 +67,22 @@ fn key_select_btn() -> button::Button {
 }
 
 fn key_file_chooser() -> Option<String> {
-    let mut chooser = dialog::FileChooser::new(
-        "./",
-        "*",
-        dialog::FileChooserType::Single,
-        "Choose SSH Private Key",
-    );
+    let mut chooser = dialog::NativeFileChooser::new(dialog::NativeFileChooserType::BrowseFile);
     chooser.show();
-    chooser.window().set_pos(300, 300);
-    while chooser.shown() {
-        app::wait();
-    }
-    if chooser.value(1).is_none() {
-        None
-    } else {
-        chooser.value(1)
-    }
-}
-
-fn key_pass_input() -> input::SecretInput {
-    let mut input = input::SecretInput::new(150, 200, 200, 30, None);
-    input.set_label("Key Password ");
-    input.set_color(*controlColor);
-    input
+    println!("{:?}", chooser.filenames());
+    let path = chooser.filenames()[0].clone().into_os_string();
+    Some(path.into_string().unwrap())
 }
 
 fn port_input() -> input::Input {
-    let mut input = input::Input::new(150, 250, 200, 30, None);
+    let mut input = input::Input::new(150, 200, 200, 30, None);
     input.set_label("Ports to Tunnel ");
     input.set_color(*controlColor);
     input
 }
 
 fn connect_btn() -> button::Button {
-    let mut btn = button::Button::new(120, 300, 170, 30, None);
+    let mut btn = button::Button::new(120, 250, 170, 30, None);
     btn.set_label("Connect!");
     btn.set_color(*controlColor);
     btn.set_selection_color(*controlAccentColor);
@@ -114,37 +94,22 @@ fn connect(
     cloned_key_input_value: String,
     cloned_host_input_value: String,
     cloned_port_input_value: String,
-    cloned_key_pass_input_value: String
 ) {
-    let mut command = std::process::Command::new("expect -c \"spawn");
-    command.arg("ssh -N -C");
+    let mut command = std::process::Command::new("ssh");
+    command.args(&["-N", "-C"]);
     if cloned_key_input_value.chars().count() != 0 {
-        command.arg("-i").arg(cloned_key_input_value);
+        command.arg(format!("-i {cloned_key_input_value}"));
     }
-    cloned_port_input_value.split(',').into_iter().for_each(|port| {
-        let trimed_port = port.trim();
-        command.arg("-L").arg(format!("{trimed_port}:127.0.0.1:{trimed_port}"));
-    });
+    cloned_port_input_value
+        .split(",")
+        .into_iter()
+        .for_each(|port| {
+            let trimed_port = port.trim();
+            command.arg(format!("-L {trimed_port}:127.0.0.1:{trimed_port}"));
+        });
     command.arg(cloned_host_input_value);
-    command.arg(format!(";expect \"Enter passphrase\";send \"{cloned_key_pass_input_value}\";interact\""));
     match command.spawn() {
-        Ok(mut process) => {
-            let mut connected_window = window::Window::default().with_size(200, 100);
-            while connected_window.shown() {
-                app::wait();
-            }
-            connected_window.set_label("Connected");
-            let mut disconnect_btn = button::Button::default();
-            disconnect_btn.set_label("Disconnect");
-            disconnect_btn.set_color(*controlColor);
-            disconnect_btn.set_selection_color(*controlAccentColor);
-            disconnect_btn.set_frame(OS_DEFAULT_BUTTON_UP_BOX);
-            disconnect_btn.set_callback(move |_| {
-                process.kill().expect("Process cannot be killed.");
-            });
-            connected_window.end();
-            connected_window.show();
-        }
-        Err(err) => panic!("{}", err)
+        Ok(_process) => (),
+        Err(err) => panic!("{}", err),
     }
 }
