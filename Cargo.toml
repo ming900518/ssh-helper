@@ -4,5 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-relm4 = { path = "relm4/relm4", features = ["libadwaita"] }
+fltk = { version = "1.3.20", features = ["fltk-bundled"] }
+fltk-theme = "0.6.0"
+fltk-table = "0.2.1"
 
+[build-dependencies]
+fl2rust = "0.4.19"

@@ -1,134 +1,150 @@
-use adw::prelude::*;
-use gtk::glib;
-use relm4::prelude::*;
-
-struct App {
-    current_section: u32,
-}
-
-#[relm4::component]
-impl SimpleComponent for App {
-    type Input = u32;
-    type Output = ();
-    type Init = ();
-
-    view! {
-        adw::Window {
-            set_default_width: 450,
-            set_default_height: 500,
-            #[name = "leaflet"]
-            adw::Leaflet {
-                set_can_navigate_back: true,
-                gtk::Box {
-                    set_orientation: gtk::Orientation::Vertical,
-                    #[name = "sidebar_header"]
-                    adw::HeaderBar {
-                        #[wrap(Some)]
-                        set_title_widget = &adw::WindowTitle {
-                            set_title: "SSH Helper",
-                        }
-                    },
-                    gtk::Box {
-                        set_orientation: gtk::Orientation::Horizontal,
-                        gtk::ListBox {
-                            set_selection_mode: gtk::SelectionMode::Single,
-                            set_vexpand: true,
-                            set_hexpand: true,
-                            add_css_class: "navigation-sidebar",
-                            adw::ActionRow {
-                                set_icon_name: Some("network-transmit-symbolic"),
-                                set_title: "Connection",
-                            },
-
-                            adw::ActionRow {
-                                set_icon_name: Some("dialog-information-symbolic"),
-                                set_title: "About"
-                            },
-
-                            connect_row_selected[sender] => move |_, row| {
-                                if let Some(row) = row {
-                                    sender.input((row.index() + 1) as u32);
-                                }
-                            }
-                        },
-                        gtk::Separator{},
-                    }
-                },
-                gtk::Box {
-                    set_orientation: gtk::Orientation::Vertical,
-                    set_hexpand: true,
-                    #[name = "content_header"]
-                    adw::HeaderBar {
-                        #[name = "back_button"]
-                        pack_start = &gtk::Button {
-                            set_icon_name: "go-previous-symbolic",
-                            connect_clicked[leaflet] => move |_| {
-                                leaflet.navigate(adw::NavigationDirection::Back);
-                            }
-                        },
-
-                        #[wrap(Some)]
-                        set_title_widget = &adw::WindowTitle {
-                            #[watch]
-                            set_title: if model.current_section == 1 {
-                                "Connection"
-                            } else {
-                                "About"
-                            },
-                        }
-                    },
-
-                    gtk::Label {
-                        add_css_class: "title-1",
-                        set_vexpand: true,
-
-                        #[watch]
-                        set_text: &format!("Page {}", model.current_section),
-                    }
-                },
-            }
-        }
-    }
-
-    fn update(&mut self, msg: u32, _: ComponentSender<Self>) {
-        self.current_section = msg;
-    }
-
-    fn init(_: (), root: &Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
-        let model = App { current_section: 1 };
-
-        let widgets = view_output!();
-
-        widgets
-            .leaflet
-            .bind_property("folded", &widgets.sidebar_header, "show-end-title-buttons")
-            .flags(glib::BindingFlags::SYNC_CREATE)
-            .build();
-        widgets
-            .leaflet
-            .bind_property(
-                "folded",
-                &widgets.content_header,
-                "show-start-title-buttons",
-            )
-            .flags(glib::BindingFlags::SYNC_CREATE)
-            .build();
-        widgets
-            .leaflet
-            .bind_property("folded", &widgets.back_button, "visible")
-            .flags(glib::BindingFlags::SYNC_CREATE)
-            .build();
-
-        ComponentParts { model, widgets }
-    }
-
-    fn pre_view() {
-        widgets.leaflet.navigate(adw::NavigationDirection::Forward);
-    }
-}
+use fltk::{prelude::*, *};
+use fltk_theme::colors::aqua::light::{controlAccentColor, controlColor};
+use fltk_theme::widget_schemes::aqua::frames::OS_DEFAULT_BUTTON_UP_BOX;
+use fltk_theme::{ThemeType, WidgetTheme};
 
 fn main() {
-    let app = RelmApp::new("tw.mingchang.ssh-helper");
-    app.run::<App>(());
-    relm4::set_global_css_from_file("style.css")
+    let app = app::App::default();
+    let theme = WidgetTheme::new(ThemeType::AquaClassic);
+    theme.apply();
+    let mut window = window::Window::default()
+        .with_size(400, 370)
+        .with_label("SSH Helper");
+    let mut title = frame::Frame::new(100, 40, 200, 30, "SSH Helper");
+    title.set_label_size(32);
+    let host_input = host_input();
+    let mut key_input = key_input();
+    let mut key_select_btn = key_select_btn();
+    let cloned_key_input = key_input.clone();
+    key_select_btn.set_callback(move |_| {
+        if let Some(path) = key_file_chooser() {
+            key_input.set_value(&path);
+        }
+    });
+    let key_pass_input = key_pass_input();
+    let port_input = port_input();
+    let mut connect_btn = connect_btn();
+    connect_btn.set_callback(move |_| {
+        connect(
+            cloned_key_input.value(),
+            host_input.clone().value(),
+            port_input.clone().value(),
+            key_pass_input.clone().value()
+        )
+    });
+    window.end();
+    window.make_resizable(false);
+    window.show();
+
+    window.set_callback(move |_| {
+        if app::event() == enums::Event::Close {
+            app.quit();
+        }
+    });
+
+    app.run().unwrap();
+}
+
+fn host_input() -> input::Input {
+    let mut input = input::Input::new(150, 100, 200, 30, None);
+    input.set_label("Host ");
+    input.set_color(*controlColor);
+    input
+}
+
+fn key_input() -> input::Input {
+    let mut input = input::Input::new(150, 150, 170, 30, None);
+    input.set_label("Private Key ");
+    input.set_color(*controlColor);
+    input
+}
+
+fn key_select_btn() -> button::Button {
+    let mut btn = button::Button::new(320, 150, 30, 30, None);
+    btn.set_label("@fileopen");
+    btn.set_color(*controlColor);
+    btn.set_selection_color(*controlAccentColor);
+    btn.set_frame(OS_DEFAULT_BUTTON_UP_BOX);
+    btn
+}
+
+fn key_file_chooser() -> Option<String> {
+    let mut chooser = dialog::FileChooser::new(
+        "./",
+        "*",
+        dialog::FileChooserType::Single,
+        "Choose SSH Private Key",
+    );
+    chooser.show();
+    chooser.window().set_pos(300, 300);
+    while chooser.shown() {
+        app::wait();
+    }
+    if chooser.value(1).is_none() {
+        None
+    } else {
+        chooser.value(1)
+    }
+}
+
+fn key_pass_input() -> input::SecretInput {
+    let mut input = input::SecretInput::new(150, 200, 200, 30, None);
+    input.set_label("Key Password ");
+    input.set_color(*controlColor);
+    input
+}
+
+fn port_input() -> input::Input {
+    let mut input = input::Input::new(150, 250, 200, 30, None);
+    input.set_label("Ports to Tunnel ");
+    input.set_color(*controlColor);
+    input
+}
+
+fn connect_btn() -> button::Button {
+    let mut btn = button::Button::new(120, 300, 170, 30, None);
+    btn.set_label("Connect!");
+    btn.set_color(*controlColor);
+    btn.set_selection_color(*controlAccentColor);
+    btn.set_frame(OS_DEFAULT_BUTTON_UP_BOX);
+    btn
+}
+
+fn connect(
+    cloned_key_input_value: String,
+    cloned_host_input_value: String,
+    cloned_port_input_value: String,
+    cloned_key_pass_input_value: String
+) {
+    let mut command = std::process::Command::new("expect -c \"spawn");
+    command.arg("ssh -N -C");
+    if cloned_key_input_value.chars().count() != 0 {
+        command.arg("-i").arg(cloned_key_input_value);
+    }
+    cloned_port_input_value.split(',').into_iter().for_each(|port| {
+        let trimed_port = port.trim();
+        command.arg("-L").arg(format!("{trimed_port}:127.0.0.1:{trimed_port}"));
+    });
+    command.arg(cloned_host_input_value);
+    command.arg(format!(";expect \"Enter passphrase\";send \"{cloned_key_pass_input_value}\";interact\""));
+    match command.spawn() {
+        Ok(mut process) => {
+            let mut connected_window = window::Window::default().with_size(200, 100);
+            while connected_window.shown() {
+                app::wait();
+            }
+            connected_window.set_label("Connected");
+            let mut disconnect_btn = button::Button::default();
+            disconnect_btn.set_label("Disconnect");
+            disconnect_btn.set_color(*controlColor);
+            disconnect_btn.set_selection_color(*controlAccentColor);
+            disconnect_btn.set_frame(OS_DEFAULT_BUTTON_UP_BOX);
+            disconnect_btn.set_callback(move |_| {
+                process.kill().expect("Process cannot be killed.");
+            });
+            connected_window.end();
+            connected_window.show();
+        }
+        Err(err) => panic!("{}", err)
+    }
 }
